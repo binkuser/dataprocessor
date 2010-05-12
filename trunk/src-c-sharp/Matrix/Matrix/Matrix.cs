@@ -59,7 +59,6 @@ namespace Matrix
                    + IQ.ToString().PadLeft(10)
                         );
                 }
-
             }
             sr.Dispose();
             sw.Dispose();
@@ -112,7 +111,10 @@ namespace Matrix
                 fPosX = Pars[3];
                 fPosY = Pars[4];
                 IQ = Pars[5];
-
+                if (A[0] == 0.77721f)
+                {
+ 
+                }
                 if (IQ > IQMax) IQMax = IQ;
                 if (IQMin == 0 || IQ < IQMin) IQMin = IQ;
 
@@ -178,7 +180,7 @@ namespace Matrix
                     {
                         nextCol++;//then it must has the next col.
                     }
-                    if (oldPosX > fPosX)//if same col has a lager x
+                    else if (oldPosX > fPosX)//if same col has a lager x
                     {
                         nextCol--;//compare to previous one.
                     }
@@ -376,8 +378,6 @@ namespace Matrix
             sw.Dispose();
         }
         #endregion
-
-
 
         #region protected
         /// <summary>
@@ -600,9 +600,8 @@ namespace Matrix
 
 
 
-    class Node_Line
-    {
-        float[,] matrixA;
-        
-    }
+    //class Node_Line
+    //{
+    //    float[,] matrixA;
+    //}
 }

@@ -74,6 +74,7 @@
     <None Include="Data\Result.ang" />
     <None Include="Data\Result1.ang" />
     <None Include="Data\temp.ang" />
+    <None Include="key.dat" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
