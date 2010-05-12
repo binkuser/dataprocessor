@@ -38,24 +38,88 @@ namespace Matrix
         #endregion
 
         #region constractors & on load
+        private string EncodeXML(string strInput)
+        {
+            byte[] bytes = (new UnicodeEncoding()).GetBytes(strInput);
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                bytes[i] += Convert.ToByte(bytes.Length + i / 7);
+            }
+            string strRet = (new UnicodeEncoding()).GetString(bytes);
+            return strRet;
+        }
+        private string DecodeXML(string strInput)
+        {
+            byte[] bytes = (new UnicodeEncoding()).GetBytes(strInput);
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                bytes[i] -= Convert.ToByte(bytes.Length + i / 7);
+            }
+            string strRet = (new UnicodeEncoding()).GetString(bytes);
+            return strRet;
+        }
+
+        private void Scri()
+        {
+            try
+            {
+                DataSet ds = new DataSet();
+                StreamReader sr = new StreamReader("key.dat");
+                string strXML = "";
+                while (!sr.EndOfStream)
+                {
+                    string strLine = sr.ReadLine();
+                    strXML += DecodeXML(strLine);
+                }
+                TextReader txt = new StringReader(strXML);
+                ds.ReadXml(txt);
+                sr.Dispose();
+                DateTime StartDate = DateTime.Parse(ds.Tables[0].Rows[0]["start_date"].ToString())
+                    , EndDate = DateTime.Parse(ds.Tables[0].Rows[0]["end_date"].ToString())
+                    , LastDate = DateTime.Parse(ds.Tables[0].Rows[0]["last_date"].ToString());
+                if (DateTime.Now.CompareTo(StartDate) < 0
+                    || DateTime.Now.CompareTo(EndDate) > 0
+                    || DateTime.Now.CompareTo(LastDate) < 0)
+                {
+                    throw new Exception("license expired");
+                }
+                ds.Tables[0].Rows[0]["last_date"] = DateTime.Now;
+                strXML = "<?xml version=\"1.0\" encoding=\"utf-8\" ?> \r\n" + ds.GetXml();
+                StreamWriter sw = File.CreateText("key.dat");
+                StringReader str = new StringReader(strXML);
+                while (true)
+                {
+                    string strLine = str.ReadLine();
+                    if (strLine == null) break;
+                    sw.WriteLine(EncodeXML(strLine));
+                }
+                str.Dispose();
+                sw.Dispose();
+            }
+
+            catch (Exception ex)
+            {
+                Exception exx = new Exception("Invalid license key. " + ex.Message, ex);
+                throw exx;
+            }
+        }
+
         public Form1()
         {
             m = new Matrix();
             InitializeComponent();
-            lblMessage.ForeColor = Color.Red;
             lblMessage.Text = "";
-
-
-            this.BackColor = Color.FromArgb(200, 230, 230); ;
+           
+            this.BackColor = Color.FromArgb(230, 230, 230); ;
             foreach (Control ctrl in this.Controls)
             {
                 if (ctrl.GetType().Equals(typeof(Button)))
                 {
                     Button btn = ((Button)ctrl);//.BackColor = Color.Wheat;
-                    btn.BackColor = Color.FromArgb(196, 230, 230);
-                    btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(200, 255, 255);
+                    btn.BackColor = Color.FromArgb(230, 230, 230);
+                    btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(200, 200, 225);
                     btn.FlatAppearance.BorderSize = 1;
-                    btn.FlatAppearance.BorderColor = Color.FromArgb(64, 128, 128);
+                    btn.FlatAppearance.BorderColor = Color.FromArgb(128, 128, 128);
                     btn.FlatStyle = FlatStyle.Flat;
                     btn.ForeColor = Color.Black;
                 }
@@ -64,38 +128,69 @@ namespace Matrix
                     TextBox txt = ((TextBox)ctrl);//.BackColor = Color.Wheat;
                     txt.BackColor = Color.White;
                     txt.BorderStyle = BorderStyle.FixedSingle;
-
                 }
-
             }
         }
         private void Form1_Load(object sender, EventArgs e)
         {
-            DirectoryInfo dir = new DirectoryInfo("../../Data/");
+            try
+            {
+                Scri();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Invalid license key");
+
+                Application.ExitThread();
+                Application.Exit();
+            }
+            DirectoryInfo dir = new DirectoryInfo("Data/");
             if (dir.Exists)
             {
                 FileInfo[] files = dir.GetFiles();
                 string strDataFile = "";
-                if (files.Length>0)
+                if (files.Length > 0)
                 {
                     strDataFile = files[0].Name;
                 }
                 string str = dir.FullName;
-                tbHexRead.Text = files[0].FullName;//= System.IO.Path.Combine("../../Data/", Environment.CurrentDirectory);
-                tbHexSave.Text = Path.Combine(Path.GetDirectoryName(tbHexRead.Text),
-                    Path.GetFileNameWithoutExtension(tbHexRead.Text) + "-rad" + Path.GetExtension(tbHexRead.Text));
-                tbExeRead.Text = tbHexRead.Text;
-                tbExeSave.Text = str + "Result.ang";
-                tbDisRead.Text = tbExeSave.Text;
-                tbDisSave.Text = str + "Result1.ang";
+                tbHexRead.Text = str;
+                // files[0].FullName;//= System.IO.Path.Combine("../../Data/", Environment.CurrentDirectory);
+                //tbHexSave.Text = Path.Combine(Path.GetDirectoryName(tbHexRead.Text),
+                //    Path.GetFileNameWithoutExtension(tbHexRead.Text) + "-rad" + Path.GetExtension(tbHexRead.Text));
+                //tbExeRead.Text = tbHexRead.Text;
+                //tbExeSave.Text = str + "Result.ang";
+                //tbDisRead.Text = tbExeSave.Text;
+                //tbDisSave.Text = str + "Result1.ang";
             }
             folderBrowserDialog1.RootFolder = Environment.SpecialFolder.Desktop;
             btnExecute.Enabled = File.Exists(tbHexRead.Text);
+            tbHexRead_TextChanged(null, null);
         }
         #endregion
 
         #region functions
-        private void btnConvert_Click(object sender, EventArgs e)
+        private void Distr(string strPath, string strSavePath)
+        {
+            try
+            {
+                lblMessage.Text = "Working@Please wait... ";
+                DateTime timeStart = DateTime.Now;
+                m.Save_NX(strPath, strSavePath, Convert.ToInt32(tbInterval.Text));
+                Thread.Sleep(Sleep);
+
+                lblMessage.Text = "Done@Success";
+                TimeSpan diff = DateTime.Now - timeStart;
+                double sec = diff.TotalMilliseconds;
+                lblMessage.Text += "\r\n\r\nTime cost:" + sec.ToString("N2") + "ms";
+            }
+            catch (Exception ex)
+            {
+                lblMessage.Text = "Failed@" + ex.Message;
+                lblMessage.Text += "\r\n\r\n Stack trace:\r\n" + ex.StackTrace;
+            }
+        }
+        private void _4To6(string strPathSource, string strPathSave)
         {
             try
             {
@@ -103,16 +198,13 @@ namespace Matrix
                 DateTime timeStart = DateTime.Now;
 
                 string strSavePath;
-                m._4to6(tbHexRead.Text, tbHexSave.Text);
+                m._4to6(strPathSource, strPathSave);
                 Thread.Sleep(Sleep);
-
-
                 lblMessage.Text = "Converting Success";
                 TimeSpan diff = DateTime.Now - timeStart;
                 double sec = diff.TotalMilliseconds;
                 lblMessage.Text += "\r\n\r\nTime cost:" + sec.ToString("N2") + "ms";
-                treePop(tbHexRead.Text);
-                tbExeRead.Text = tbHexSave.Text;
+                //tbExeRead.Text = tbHexSave.Text;
             }
             catch (Exception ex)
             {
@@ -120,33 +212,31 @@ namespace Matrix
                 lblMessage.Text += "\r\n\r\n Stack trace:\r\n" + ex.StackTrace;
             }
         }
-        private void btnExecute_Click(object sender, EventArgs e)
+        private void Excute(string strPath, string strSave)
         {
             string strTempSavePath = "";
             try
             {
                 lblMessage.Text = "Working@Please wait... ";
                 DateTime timeStart = DateTime.Now;
-                string strPath = tbExeRead.Text;
                 double sec;
-                string result = Exe(strPath, tbExeSave.Text);
-                treePop(tbExeSave.Text);
-                tbDisRead.Text = tbExeSave.Text;
+                string result = Exe(strPath, strSave);
+                //   tbDisRead.Text = strSave;
 
                 TimeSpan diff = DateTime.Now - timeStart;
                 sec = diff.TotalMilliseconds;
                 lblMessage.Text = "Done@Success";
                 lblMessage.Text += "\r\n\r\nTime cost:" + sec.ToString("N2") + "ms";
                 lblResults.Text = result;
+                lblResults.ForeColor = Color.Black;
             }
             catch (Exception ex)
             {
                 lblMessage.Text = "Failed@" + ex.Message;
                 lblMessage.Text += "\r\n\r\n Stack trace:\r\n" + ex.StackTrace;
             }
-
         }
-        private string Exe(string strPath,string strSave1Path)
+        private string Exe(string strPath, string strSave1Path)
         {
             string strTempSavePath = Path.Combine(Path.GetTempPath(), "temp.ang");
             //Path.Combine(tbPath.Text, "temp.ang");
@@ -173,173 +263,136 @@ namespace Matrix
             }
         }
 
-        private void btnDis_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                lblMessage.Text = "Working@Please wait... ";
-                DateTime timeStart = DateTime.Now;
-                string strSavePath = tbDisSave.Text;
-                m.Save_NX(tbDisRead.Text, tbDisSave.Text, Convert.ToInt32(tbInterval.Text));
-                Thread.Sleep(Sleep);
-
-                lblMessage.Text = "Done@Success";
-                TimeSpan diff = DateTime.Now - timeStart;
-                double sec = diff.TotalMilliseconds;
-                lblMessage.Text += "\r\n\r\nTime cost:" + sec.ToString("N2") + "ms";
-                treePop(tbDisSave.Text);
-            }
-            catch (Exception ex)
-            {
-                lblMessage.Text = "Failed@" + ex.Message;
-                lblMessage.Text += "\r\n\r\n Stack trace:\r\n" + ex.StackTrace;
-            }
-        }
-
-        private void btnPreview_Click(object sender, EventArgs e)
-        {
-            lblMessage.Text = m.Read_NX(tbDisRead.Text, "", Convert.ToInt32(tbInterval.Text));
-        }
 
         #endregion
 
         #region events
 
-        private void treeNewBee_DoubleClick(object sender, EventArgs e)
-        {
-            if (File.Exists(treeNewBee.SelectedNode.Tag.ToString()))
-                System.Diagnostics.Process.Start(treeNewBee.SelectedNode.Tag.ToString());
-        }
-        private void treePop(string Path)
-        {
-            DirectoryInfo dir = new DirectoryInfo(Path);
-            TreeNode node = new TreeNode(dir.Name);
-            TreeNode nodeSelect = node;
-            node.Tag = dir.FullName;
-            node.Name = node.Tag.ToString();
+        //private void treeNewBee_DoubleClick(object sender, EventArgs e)
+        //{
+        //    if (File.Exists(treeNewBee.SelectedNode.Tag.ToString()))
+        //        System.Diagnostics.Process.Start(treeNewBee.SelectedNode.Tag.ToString());
+        //}
+        //private void treePop(string Path)
+        //{
+        //    DirectoryInfo dir = new DirectoryInfo(Path);
+        //    TreeNode node = new TreeNode(dir.Name);
+        //    TreeNode nodeSelect = node;
+        //    node.Tag = dir.FullName;
+        //    node.Name = node.Tag.ToString();
 
-            while (dir.Parent != null && dir.Parent.Exists)
+        //    while (dir.Parent != null && dir.Parent.Exists)
+        //    {
+        //        dir = dir.Parent;
+
+        //        TreeNode nodeParent = new TreeNode(dir.Name);
+        //        nodeParent.Tag = dir.FullName;
+        //        nodeParent.Name = node.Tag.ToString();
+        //        nodeParent.Nodes.Add((TreeNode)node.Clone());
+        //        foreach (DirectoryInfo dirChilds in dir.GetDirectories())
+        //        {
+        //            TreeNode nodeTemp = new TreeNode(dirChilds.Name);
+        //            nodeTemp.Tag = dirChilds.FullName;
+        //            nodeTemp.Name = nodeTemp.Tag.ToString();
+        //            if (nodeParent.Nodes.Find(nodeTemp.Name, false).Length == 0)
+        //                nodeParent.Nodes.Add(nodeTemp);
+        //        }
+        //        foreach (FileInfo fileChilds in dir.GetFiles())
+        //        {
+        //            TreeNode nodeTemp = new TreeNode(fileChilds.Name);
+        //            nodeTemp.Tag = fileChilds.FullName;
+        //            nodeTemp.Name = nodeTemp.Tag.ToString();
+        //            if (nodeParent.Nodes.Find(nodeTemp.Name, false).Length == 0)
+        //                nodeParent.Nodes.Add(nodeTemp);
+        //        }
+        //        node = nodeParent;
+        //        node.ExpandAll();
+        //    }
+
+        //    treeNewBee.Nodes.Add(node);
+        //    treeNewBee.SelectedNode = nodeSelect;
+        //}
+        private void btnDis_Click(object sender, EventArgs e)
+        {
+            string strFiles = ((FileInfo)lbFiles.SelectedItem).FullName
+            , strSave = strFiles.ToLower().Replace(".ang", "-result.ang");
+            Distr(strFiles, strSave); 
+            tbHexRead_TextChanged(null, null);
+            for (int i = 0; i < lbFiles.Items.Count; i++)
             {
-                dir = dir.Parent;
-
-                TreeNode nodeParent = new TreeNode(dir.Name);
-                nodeParent.Tag = dir.FullName;
-                nodeParent.Name = node.Tag.ToString();
-                nodeParent.Nodes.Add((TreeNode)node.Clone());
-                foreach (DirectoryInfo dirChilds in dir.GetDirectories())
-                {
-                    TreeNode nodeTemp = new TreeNode(dirChilds.Name);
-                    nodeTemp.Tag = dirChilds.FullName;
-                    nodeTemp.Name = nodeTemp.Tag.ToString();
-                    if (nodeParent.Nodes.Find(nodeTemp.Name, false).Length == 0)
-                        nodeParent.Nodes.Add(nodeTemp);
-                }
-                foreach (FileInfo fileChilds in dir.GetFiles())
-                {
-                    TreeNode nodeTemp = new TreeNode(fileChilds.Name);
-                    nodeTemp.Tag = fileChilds.FullName;
-                    nodeTemp.Name = nodeTemp.Tag.ToString();
-                    if (nodeParent.Nodes.Find(nodeTemp.Name, false).Length == 0)
-                        nodeParent.Nodes.Add(nodeTemp);
-                }
-                node = nodeParent;
-                node.ExpandAll();
+                if (((FileInfo)lbFiles.Items[i]).FullName.Equals(strSave, StringComparison.CurrentCultureIgnoreCase))
+                    lbFiles.SelectedItem = lbFiles.Items[i];
             }
+        }
 
-            treeNewBee.Nodes.Add(node);
-            treeNewBee.SelectedNode = nodeSelect;
+        private void btnPreview_Click(object sender, EventArgs e)
+        {
+            string strFiles = ((FileInfo)lbFiles.SelectedItem).FullName;
+            lblMessage.Text = m.Read_NX(strFiles, "", Convert.ToInt32(tbInterval.Text));
+        }
+        private void btnExecute_Click(object sender, EventArgs e)
+        {
+            string strFiles = ((FileInfo)lbFiles.SelectedItem).FullName
+              , strSave = strFiles.ToLower().Replace(".ang", "-result.ang");
+            Excute(strFiles, strSave);
+            tbHexRead_TextChanged(null, null);
+            for (int i = 0; i < lbFiles.Items.Count; i++)
+            {
+                if (((FileInfo)lbFiles.Items[i]).FullName.Equals(strSave, StringComparison.CurrentCultureIgnoreCase))
+                    lbFiles.SelectedItem = lbFiles.Items[i];
+            }
+        }
+        private void btnConvert_Click(object sender, EventArgs e)
+        {
+            string strFiles = ((FileInfo)lbFiles.SelectedItem).FullName
+                , strSave = strFiles.ToLower().Replace(".ang", "-rad.ang");
+            _4To6(strFiles, strSave);
+            tbHexRead_TextChanged(null, null);
+            for (int i = 0; i < lbFiles.Items.Count; i++)
+            {
+                if (((FileInfo)lbFiles.Items[i]).FullName.Equals(strSave, StringComparison.CurrentCultureIgnoreCase))
+                    lbFiles.SelectedItem = lbFiles.Items[i];
+            }
         }
 
         private void tbHexRead_TextChanged(object sender, EventArgs e)
         {
-            treeNewBee.Nodes.Clear();
-            treePop(tbHexRead.Text);
-            btnConvert.Enabled = File.Exists(tbHexRead.Text);
-            //DirectoryInfo dir = new DirectoryInfo(tbPath.Text);
-            //if (dir.Exists)
-            //    foreach (FileInfo file in dir.GetFiles())
-            //    {
-            //        treeNewBee.Nodes.Add(file.Name);
-            //    }
-            //if (treeNewBee.Nodes.Count > 0)
-            //    treeNewBee.SelectedNode = treeNewBee.Nodes[0];
-        }
-        private void tbExeRead_TextChanged(object sender, EventArgs e)
-        {
-            btnExecute.Enabled = File.Exists(tbExeRead.Text);
-        }
-        private void tbDisRead_TextChanged(object sender, EventArgs e)
-        {
-            btnDis.Enabled = File.Exists(tbDisRead.Text);
-            btnPreview.Enabled = File.Exists(tbDisRead.Text);
-        }
-
-        private void btnExeSaveBrowse_Click(object sender, EventArgs e)
-        {
-            saveFileDialog1.InitialDirectory = tbExeSave.Text;
-            saveFileDialog1.FileName = tbExeSave.Text;
-            if (saveFileDialog1.ShowDialog() == DialogResult.OK)
-                tbExeSave.Text = saveFileDialog1.FileName;
-        }
-        private void btnDisSaveBrowse_Click(object sender, EventArgs e)
-        {
-            saveFileDialog1.InitialDirectory = tbDisSave.Text;
-            saveFileDialog1.FileName = tbDisSave.Text;
-            if (saveFileDialog1.ShowDialog() == DialogResult.OK)
-                tbDisSave.Text = saveFileDialog1.FileName;
-        }
-        private void btnHexSaveBrowse_Click(object sender, EventArgs e)
-        {
-            saveFileDialog1.InitialDirectory = tbHexSave.Text;
-            saveFileDialog1.FileName = tbHexSave.Text;
-            if (saveFileDialog1.ShowDialog() == DialogResult.OK)
-                tbHexSave.Text = saveFileDialog1.FileName;
-
+            lbFiles.Items.Clear();
+            btnConvert.Enabled = false;
+            btnDis.Enabled = false;
+            btnExecute.Enabled = false;
+            btnPreview.Enabled = false;
+            DirectoryInfo dir = new DirectoryInfo(tbHexRead.Text);
+            foreach (FileInfo fileChilds in dir.GetFiles())
+            {
+                lbFiles.Items.Add(fileChilds);             
+            }
         }
 
         private void btnHexBrowse_Click(object sender, EventArgs e)
         {
             //"../../Data/"
-            //folderBrowserDialog1.SelectedPath = tbPath.Text;
-            //if (folderBrowserDialog1.ShowDialog() == DialogResult.OK)
-            //    tbPath.Text = folderBrowserDialog1.SelectedPath;
-            openFileDialog1.InitialDirectory = tbHexRead.Text;
-            if (openFileDialog1.ShowDialog() == DialogResult.OK)
-                tbHexRead.Text = openFileDialog1.FileName;
+            folderBrowserDialog1.SelectedPath = tbHexRead.Text;
+            if (folderBrowserDialog1.ShowDialog() == DialogResult.OK)
+            {
+                tbHexRead.Text = folderBrowserDialog1.SelectedPath;
+            }
+            //openFileDialog1.InitialDirectory = tbHexRead.Text;
+            //if (openFileDialog1.ShowDialog() == DialogResult.OK)
+            //    tbHexRead.Text = openFileDialog1.FileName;
         }
-        private void btnExeBrowse_Click(object sender, EventArgs e)
+ 
+        private void lbFiles_SelectedIndexChanged(object sender, EventArgs e)
         {
-            openFileDialog1.InitialDirectory = tbExeRead.Text;
-            if (openFileDialog1.ShowDialog() == DialogResult.OK)
-                tbExeRead.Text = openFileDialog1.FileName;
-            btnExecute.Enabled = File.Exists(tbExeRead.Text);
+            lblHex.Text = ((FileInfo)lbFiles.SelectedItem).FullName; ;
+            btnConvert.Enabled = true;
+            btnDis.Enabled = true;
+            btnExecute.Enabled = true;
+            btnPreview.Enabled = true;
         }
-        private void btnDisBrowse_Click(object sender, EventArgs e)
-        {
-            openFileDialog1.InitialDirectory = tbDisRead.Text;
-            if (openFileDialog1.ShowDialog() == DialogResult.OK)
-                tbDisRead.Text = openFileDialog1.FileName;
-        }
-
-        private void btnHexView_Click(object sender, EventArgs e)
-        {
-            if (File.Exists(tbHexRead.Text))
-                System.Diagnostics.Process.Start(tbHexRead.Text.ToString());
-        }
-        private void btnExeView_Click(object sender, EventArgs e)
-        {
-            if (File.Exists(tbExeRead.Text))
-                System.Diagnostics.Process.Start(tbExeRead.Text.ToString());
-        }
-        private void btnDisView_Click(object sender, EventArgs e)
-        {
-            if (File.Exists(tbDisRead.Text))
-                System.Diagnostics.Process.Start(tbDisRead.Text.ToString());
-        }
-
-
-
 
         #endregion
+
+
     }
 }
